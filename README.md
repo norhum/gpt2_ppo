@@ -12,3 +12,7 @@ This project aims to fine-tune the GPT-2 (124M) language model using Proximal Po
 ## Acknowledgements
 
 This project adapts code from Andrej Karpathy's [karpathy/build-nanogpt] ([https://github.com/karpathy/build-nanogpt]), specifically the [train_gpt2.py]. Thank you to Andrej Karpathy for making his work publicly available.
+
+## Practial Limitations
+
+I tried using latest models such as Llama-3.2-3B for the reward model but dealing with different tokenization method made it really hard to implement.  

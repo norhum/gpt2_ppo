@@ -21,7 +21,7 @@ class ValueNetwork(nn.Module):
         return state_value.squeeze() #(Batch)
 
 class LLMEnvironment:
-    def __init__(self, better_model, max_tokens=50):
+    def __init__(self, better_model, device, max_tokens=50):
         """
         Initialize the LLM environment
         
@@ -29,29 +29,28 @@ class LLMEnvironment:
             better_model: The stronger LLM model used to generate next tokens and probabilities
             max_tokens: Maximum sequence length before episode terminates
         """
-        self.better_model = better_model
+        self.better_model = better_model.to(device)
         self.max_tokens = max_tokens
         self.reset()
     
     def reset(self):
         """Reset the environment to initial state with a new starting token"""
-        from transformers import GPT2Tokenizer
-        enc = GPT2Tokenizer.from_pretrained('gpt2')
-
-        tokens = enc.encode("Hello, I'm a language model,")
-        tokens = torch.tensor(tokens, dtype=torch.long) # (8,)
-        tokens = tokens.unsqueeze(0).to("cuda")
-        
-        self.current_tokens = tokens
+        from transformers import AutoTokenizer
+        import torch
+        enc = AutoTokenizer.from_pretrained("gpt2")
+        tokens = enc.encode("Hello, I'm a language model,", add_special_tokens=True)
+        tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")  # (1, seq_len)
         self.num_steps = 0
-        return self.current_tokens
+  
+        return tokens
     
-    def step(self, action_tokens):
+    def step(self, state, action_token):
         """
         Take a step in the environment by adding a token
         
         Args:
-            action_tokens: The tokens chosen by the agent 
+            state: Current state (1, seq_len) 
+            action_tokens: The token chosen by the agent (1,)
             
         Returns:
             next_state: Updated token sequence
@@ -61,13 +60,13 @@ class LLMEnvironment:
         self.num_steps += 1
 
         # Calculate reward as probability
-        next_token_probs = F.softmax(self.better_model(action_tokens).logits, dim=-1) #(1, 9, 128256)
-        next_token_probs_last_pos = next_token_probs[0, -1, :]  # Shape: (128256,)
+        next_token_probs = F.softmax(self.better_model(state).logits, dim=-1) #(1, 9, 50257)
+        next_token_probs_last_pos = next_token_probs[0, -1, :]  # Shape: (50257,)
         next_token = torch.multinomial(next_token_probs_last_pos, 1)  # Returns a tensor with shape (1,)
-        next_state = action_tokens + next_token
+        next_token = next_token.unsqueeze(0) #(1, 1)
+        next_state = torch.cat((state, next_token), dim=1) #(1, 8)
 
-        next_token_probability = next_token_probs_last_pos[next_token]
-        reward = next_token_probability
+        reward = next_token_probs_last_pos[action_token]
         
         # Check if we're done
         done = self.num_steps >= self.max_tokens or next_token.item() == 128001
@@ -88,20 +87,21 @@ class PPOAgent:
         self.batch_size = batch_size
 
         # Policy Network
-        self.policy_network = GPT(GPTConfig(vocab_size=50304)).to(self.device)
+        self.policy_network = GPT.from_pretrained('gpt2').to(self.device)
 
         # Value Network
-        self.value_network = ValueNetwork(GPT(GPTConfig(vocab_size=50304))).to(self.device)
+        self.value_network = ValueNetwork(GPT.from_pretrained('gpt2')).to(self.device)
 
         self.policy_optimizer = optim.AdamW(self.policy_network.parameters(), lr=learning_rate)
         self.value_optimizer = optim.AdamW(self.value_network.parameters(), lr=learning_rate)
         
-    def get_action(self, state): #(1, seq_len)
+    def get_action(self, state):  # (1, seq_len)
         with torch.no_grad():
-            action_probs = self.policy_network(state)["probs"] #(1, seq_len, n_embd)
-            action = torch.multinomial(action_probs.squeeze(), num_samples=1).squeeze()
-        return action #(seq_len) gives the index for the selected tokens
-    
+            action_probs = self.policy_network(state)["probs"]  # (1, seq_len, vocab_size)
+            action_probs = action_probs.squeeze(0)  # (seq_len, vocab_size)
+            action = torch.multinomial(action_probs, num_samples=1)  # (seq_len, 1)
+            return action.squeeze(-1)[-1]  # (1,)
+        
     def get_value(self, state):
          with torch.no_grad():
             state_tensor = torch.FloatTensor(self.one_hot_encode(state)).to(self.device)

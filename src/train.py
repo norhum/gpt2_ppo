@@ -2,11 +2,7 @@ import os
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from huggingface_hub import login
 from ppo import LLMEnvironment, PPOAgent
-
-hf_token = os.getenv('HF_TOKEN')
-login(hf_token)
 
 # Load environment model
 # env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
@@ -39,21 +35,20 @@ def train_ppo_agent(episodes=1000):
             state = next_state
             total_reward += reward
 
-        max_len = max(state.size(0) for state in episode_states)  # Find the max sequence length (seq_len)
+        max_len = max(state.size(1) for state in episode_states)  # Find the max sequence length (seq_len)
+        tokenizer.pad_token = tokenizer.eos_token
 
         padded_episode_states = []
         for state in episode_states:
-            padding_size = max_len - state.size(0)  
+            padding_size = max_len - state.size(1)  
             if padding_size > 0:
                 # Pad with eos_token 
-                padded_state = F.pad(state, (0, padding_size), value=tokenizer.eos_token_id)
-                print(padded_state)
+                padded_state = F.pad(state, (0, padding_size), value=tokenizer.pad_token_id)
                 padded_episode_states.append(padded_state)
             else:
                 padded_episode_states.append(state)
 
         # Step 3: Stack the tensors (now they all have the same length)
-        #should probably pad it to process it by batches and be aware of the attention mask as well
         episode_states = torch.stack(padded_episode_states).to(device)  # (B, max_len)
         episode_actions = torch.stack(episode_actions).to(device)  # (B,)
         episode_rewards = torch.tensor(episode_rewards).to(device)  # (B,)

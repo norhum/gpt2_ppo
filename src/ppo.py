@@ -5,7 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 from model import GPT, GPTConfig
 
-#todo's : LLMEnvironment reset is linked to adding new data / ppo features yet uncovered / training and validation / hellaswag
+# todo's : implement attention mask in gpt and use gpt that i coded instead / LLMEnvironment reset is linked to adding new data / ppo features in paper yet uncovered / training and validation / hellaswag
+# possible error : reward might not be correctly implemented
 
 class ValueNetwork(nn.Module):
     def __init__(self, pretrained_model):
@@ -69,11 +70,12 @@ class LLMEnvironment:
         reward = next_token_probs_last_pos[action_token]
         
         # Check if we're done
-        done = self.num_steps >= self.max_tokens or next_token.item() == 128001
+        done = self.num_steps >= self.max_tokens 
         
         # Can add additional done conditions like:
         # - Better model gives very low probability
         # - Generated invalid sequence
+        # Can't stop and eos_token since we use that for padding
         
         return next_state, reward, done
 
@@ -108,7 +110,7 @@ class PPOAgent:
             value = self.value_network(state_tensor)
             return value.item()
     
-    def train(self, state_tensors, action_tensors, reward_tensors):
+    def train(self, state_tensors, attention_mask, action_tensors, reward_tensors):
         
         # Calculate discounted rewards for the entire episode
         discounted_rewards = []
@@ -121,9 +123,9 @@ class PPOAgent:
 
         # Precompute old probabilities and values (detached from computation graph)
         with torch.no_grad():
-            old_action_probs = self.policy_network(state_tensors)["probs"].gather(2, action_tensors.unsqueeze(-1)).squeeze(-1) #(B, seq_len)
+            old_action_probs = self.policy_network(state_tensors, attention_mask=attention_mask)["probs"].gather(2, action_tensors.unsqueeze(-1)).squeeze(-1) #(B, seq_len)
 
-            old_values = self.value_network(state_tensors) #(B,)
+            old_values = self.value_network(state_tensors, attention_mask=attention_mask) #(B,)
             advantages = discounted_rewards - old_values #(B,)
             # Normalize advantages
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) #(B,)
@@ -138,13 +140,14 @@ class PPOAgent:
                 batch_indices = indices[start:end]
                 
                 batch_state_tensors = state_tensors[batch_indices] #(b,)
+                batch_attention_mask = attention_mask[batch_indices]
                 batch_action_tensors = action_tensors[batch_indices] #(b, seq_len)
                 batch_advantages = advantages[batch_indices] #(b,)
                 batch_discounted_rewards = discounted_rewards[batch_indices] #(b,)
                 batch_old_action_probs = old_action_probs[batch_indices] #(b, seq_len)
 
                 # Policy loss
-                new_action_probs = self.policy_network(batch_state_tensors).gather(2, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b, seq_len)
+                new_action_probs = self.policy_network(batch_state_tensors, attention_mask=batch_attention_mask).gather(2, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b, seq_len)
                 ratios = new_action_probs / (batch_old_action_probs + 1e-8) #(b, seq_len)
                 
                 clipped_ratios = torch.clamp(ratios, 1 - self.clip_epsilon, 1 + self.clip_epsilon) #(b, seq_len)
@@ -159,7 +162,7 @@ class PPOAgent:
                 self.policy_optimizer.step()
 
                 # Value loss
-                values = self.value_network(batch_state_tensors) #(b,)
+                values = self.value_network(batch_state_tensors, attention_mask=batch_attention_mask) #(b,)
                 value_loss = F.mse_loss(values, batch_discounted_rewards)
 
                 self.value_optimizer.zero_grad()

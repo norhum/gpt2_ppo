@@ -1,20 +1,19 @@
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, GPT2Tokenizer
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
 from ppo import LLMEnvironment, PPOAgent
 
 hf_token = os.getenv('HF_TOKEN')
 login(hf_token)
 
-# Load environment tokenizer and model
-# env_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neo-2.7B")
+# Load environment model
 # env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
-env_tokenizer = AutoTokenizer.from_pretrained("gpt2")
 env_model = AutoModelForCausalLM.from_pretrained("gpt2")
 
-# Load agent tokenizer 
-agent_tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+# Load tokenizer 
+tokenizer = AutoTokenizer.from_pretrained('gpt2')
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -40,12 +39,30 @@ def train_ppo_agent(episodes=1000):
             state = next_state
             total_reward += reward
 
-        # Convert lists to tensors with desired shapes
-        episode_states = torch.stack(episode_states).to(device)  # (B, seq_len + k), where k is increasing (e.g., 0, 1, 2, ...)
+        max_len = max(state.size(0) for state in episode_states)  # Find the max sequence length (seq_len)
+
+        padded_episode_states = []
+        for state in episode_states:
+            padding_size = max_len - state.size(0)  
+            if padding_size > 0:
+                # Pad with eos_token 
+                padded_state = F.pad(state, (0, padding_size), value=tokenizer.eos_token_id)
+                print(padded_state)
+                padded_episode_states.append(padded_state)
+            else:
+                padded_episode_states.append(state)
+
+        # Step 3: Stack the tensors (now they all have the same length)
+        #should probably pad it to process it by batches and be aware of the attention mask as well
+        episode_states = torch.stack(padded_episode_states).to(device)  # (B, max_len)
         episode_actions = torch.stack(episode_actions).to(device)  # (B,)
         episode_rewards = torch.tensor(episode_rewards).to(device)  # (B,)
 
-        agent.train(episode_states, episode_actions, episode_rewards)
+        # Create padding mask based on eos_token
+        eos_token_id = tokenizer.eos_token_id
+        attention_mask = (episode_states != eos_token_id).long()  # 1 for non-padding tokens, 0 for padding tokens
+
+        agent.train(episode_states, attention_mask, episode_actions, episode_rewards)
         
         if episode % 100 == 0:
             print(f"Episode {episode}: Total Reward = {total_reward}")

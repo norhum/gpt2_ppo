@@ -21,7 +21,13 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                              .view(1, 1, config.block_size, config.block_size))
         
-    def forward(self, x):
+    def adapt_attention_mask(self, attention_mask):
+        B, T = attention_mask.shape
+        adapted_mask = attention_mask.view(B, 1, 1, T)  
+        adapted_mask = adapted_mask.expand(-1, 1, T, -1) # (B, 1, T, T)
+        return adapted_mask
+        
+    def forward(self, x, attention_mask=None):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         # nh is "number of heads", hs is "head size", and C (number of channels) = nh * hs
@@ -34,7 +40,12 @@ class CausalSelfAttention(nn.Module):
 
         # # attention (materializes the large (T, T) matric for all the queries and keys)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+        if attention_mask is not None:
+            attention_mask = self.adapt_attention_mask(attention_mask)
+            att = att.masked_fill(attention_mask == 0, float('-inf')) 
+        else:
+            att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+         
         att = F.softmax(att, dim=-1)
         y = att @ v # (B, nh, T, T) @ (B, nh, T, hs) -> (B, nh, T, hs)
 
@@ -77,8 +88,8 @@ class Block(nn.Module):
         self.ln_2 = nn.LayerNorm(config.n_embd)
         self.mlp = MLP(config)
 
-    def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
+    def forward(self, x, attention_mask=None):
+        x = x + self.attn(self.ln_1(x), attention_mask)
         x = x + self.mlp(self.ln_2(x))
         return x
 
@@ -120,7 +131,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
            
-    def forward(self, idx, targets=None):
+    def forward(self, idx, attention_mask=None, targets=None):
         # idx is of shape (B, T)
         B, T = idx.size()
         assert T <= self.config.block_size, f"cannot forward sequence of length {T}, block size is only {self.config.block_size}"
@@ -131,7 +142,7 @@ class GPT(nn.Module):
         x = tok_emb + pos_emb
         # forward the blocks of the transformer
         for block in self.transformer.h:
-            x = block(x)
+            x = block(x, attention_mask)
         # forward the final layernormm and the classifier head
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x) # shape (B, T, vocab_size)

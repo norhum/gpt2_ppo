@@ -49,13 +49,13 @@ def train_ppo_agent(episodes=1000):
                 padded_episode_states.append(state)
 
         # Step 3: Stack the tensors (now they all have the same length)
-        episode_states = torch.stack(padded_episode_states).to(device)  # (B, max_len)
+        episode_states = torch.stack(padded_episode_states).squeeze().to(device)  # (B, max_len)
         episode_actions = torch.stack(episode_actions).to(device)  # (B,)
         episode_rewards = torch.tensor(episode_rewards).to(device)  # (B,)
 
         # Create padding mask based on eos_token
         eos_token_id = tokenizer.eos_token_id
-        attention_mask = (episode_states != eos_token_id).long()  # 1 for non-padding tokens, 0 for padding tokens
+        attention_mask = (episode_states != eos_token_id).long().squeeze()  # # (B, max_len) 1 for non-padding tokens, 0 for padding tokens 
 
         agent.train(episode_states, attention_mask, episode_actions, episode_rewards)
         

@@ -22,7 +22,7 @@ Integrating more recent and powerful models (e.g., Llama-3.2-3B) as the reward m
 
 ## Acknowledgements
 
-This project currently adapts code from Andrej Karpathy's [karpathy/build-nanogpt](https://github.com/karpathy/build-nanogpt), specifically the `train_gpt2.py` script. Thank you to Andrej Karpathy for making his work publicly available.
+This project currently adapts code from Andrej Karpathy's [karpathy/build-nanogpt](https://github.com/karpathy/build-nanogpt), specifically the `train_gpt2.py` script(I have modified some part of the code to adapt to my project). Thank you Andrej Karpathy for making your work publicly available.
 
 ## Future Work
 

@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 import numpy as np
 from model import GPT
 
-# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag
+# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag / move the data to data directory
 # possible error : different reward scheme might be better
 
 class ValueNetwork(nn.Module):

@@ -8,3 +8,5 @@ models/
 .env
 
 src/mymodel.py
+
+hellaswag/

@@ -1,4 +1,4 @@
-import os
+import time
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -16,8 +16,10 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 def train_ppo_agent(episodes=1000):
     env = LLMEnvironment(env_model, device=device)
     agent = PPOAgent(device=device)
+    data = []
 
     for episode in range(episodes):
+        start_time = time.time()
         state = env.reset(episode)
         done = False
         episode_states, episode_actions, episode_rewards = [], [], []
@@ -57,24 +59,28 @@ def train_ppo_agent(episodes=1000):
         eos_token_id = tokenizer.eos_token_id
         attention_mask = (episode_states != eos_token_id).long().squeeze()  # (B, max_len) 1 for non-padding tokens, 0 for padding tokens 
 
-        end_time = time.time() 
-        elapsed_time = end_time - start_time  
-        print(f"before train:  {elapsed_time:.4f} seconds")
+        train_data = agent.train(episode_states, attention_mask, episode_actions, episode_rewards) # this is where it takes the most time and resource
+        data.append(train_data)
 
-        agent.train(episode_states, attention_mask, episode_actions, episode_rewards) # this is where it takes the most time and resource
-        
         if episode % 100 == 0:
             print(f"Episode {episode}: Total Reward = {total_reward:.6f}")
 
-    return agent
+        if episode % 10 == 0:
+            torch.save(agent.policy_network.state_dict(), f"models/policy_network_weights_{episode}.pth")
+            torch.save(agent.policy_optimizer.state_dict(), f"models/policy_optimizer_{episode}.pth")  
+            torch.save(agent.value_network.state_dict(), f"models/value_network_weights_{episode}.pth")
+            torch.save(agent.value_optimizer.state_dict(), f"models/value_optimizer_{episode}.pth")  
+
+        end_time = time.time()
+        print(f"episode: {episode}, took {end_time - start_time:.4f} seconds")
+        print()
+
+    return agent, data
 
 # --------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    import time
-    start_time = time.time()
-
     device = device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training Proximal Policy Optimization Agent:")
     print(device)
-    trained_agent = train_ppo_agent(episodes=2)
+    trained_agent, data = train_ppo_agent(episodes=2)

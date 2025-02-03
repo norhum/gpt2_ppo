@@ -7,7 +7,7 @@ import numpy as np
 from model import GPT
 
 # todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag
-# possible error : reward might not be correctly implemented
+# possible error : different reward scheme might be better
 
 class ValueNetwork(nn.Module):
     def __init__(self, pretrained_model):
@@ -33,8 +33,7 @@ class LLMEnvironment:
         """
         self.better_model = better_model.to(device)
         self.max_tokens = max_tokens
-        self.reset()
-    
+
     def reset(self, i):
         """Reset the environment to initial state with a new starting token"""
         enc = AutoTokenizer.from_pretrained("gpt2")
@@ -81,13 +80,15 @@ class LLMEnvironment:
         return next_state, reward, done
 
 class PPOAgent:
-    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=5, batch_size=64):      
+    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=5, batch_size=64, kl_beta=0.1, kl_epsilon=1e-8):      
         self.device = device
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.clip_epsilon = clip_epsilon
         self.update_epochs = update_epochs
         self.batch_size = batch_size
+        self.kl_beta = kl_beta
+        self.kl_epsilon = kl_epsilon
 
         # Policy Network
         self.policy_network = GPT.from_pretrained('gpt2').to(self.device)
@@ -139,14 +140,22 @@ class PPOAgent:
             # Normalize advantages
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) #(B,)
 
-        for epoch in range(self.update_epochs):
+        kl_losses = []
+        preclipped_ratios = []
+        policy_losses = []
+        value_losses = []
 
-            import time
-            start_time = time.time() 
+        for epoch in range(self.update_epochs):
 
             # Shuffle data
             indices = np.arange(len(state_tensors))
             np.random.shuffle(indices)
+
+            kl_loss_epoch = 0
+            preclipped_ratio_epoch = 0
+            policy_loss_epoch = 0
+            value_loss_epoch = 0
+            n = 0
 
             for start in range(0, len(state_tensors), self.batch_size):
         
@@ -167,11 +176,17 @@ class PPOAgent:
                 new_action_probs = inter.gather(1, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b,)
                 ratios = new_action_probs / (batch_old_action_probs + 1e-8) #(b,)
 
+                # Compute the KL divergence element-wise for each action in the batch
+                batch_old_action_probs = torch.clamp(batch_old_action_probs, min=self.kl_epsilon, max=1.0)
+                new_action_probs = torch.clamp(new_action_probs, min=self.kl_epsilon, max=1.0)
+                kl_loss = torch.sum(batch_old_action_probs * torch.log(batch_old_action_probs / new_action_probs), dim=0).mean()
+                kl_loss_epoch += kl_loss
+
                 clipped_ratios = torch.clamp(ratios, 1 - self.clip_epsilon, 1 + self.clip_epsilon) #(b,)
-                avg_clipped_ratio = clipped_ratios.mean()
-                print(f"Average Clipped Ratio: {avg_clipped_ratio:.6f}")
-                policy_loss = -torch.min(ratios * batch_advantages, clipped_ratios * batch_advantages).mean()
-                print(f"policy_loss: {policy_loss:.6f}")
+                preclipped_ratio = ratios.mean()
+                preclipped_ratio_epoch += preclipped_ratio
+                policy_loss = -torch.min(ratios * batch_advantages, clipped_ratios * batch_advantages).mean() + self.kl_beta * kl_loss
+                policy_loss_epoch += policy_loss
                 #old_action_probs and advantages aren't being updated, only the new_action_probs are
                 #advantages>0 means an action was better than expected
                 #ratios>0 means the new policy is increasing the probability of that action
@@ -185,12 +200,24 @@ class PPOAgent:
                 values = self.value_network(batch_state_tensors, attention_mask=batch_attention_mask) #(b,)
   
                 value_loss = F.mse_loss(values, batch_discounted_rewards)
-                print(f"value_loss: {value_loss:.6f}")
+                value_loss_epoch += value_loss
 
                 self.value_optimizer.zero_grad()
                 value_loss.backward()
                 self.value_optimizer.step()
 
-            end_time = time.time() 
-            elapsed_time = end_time - start_time
-            print(f"after epoch {epoch+1}:  {elapsed_time:.4f} seconds")
+                n += 1
+            
+            print(f"epoch: {epoch}, average kl_loss: {kl_loss_epoch/n:.6f}, average preclipped_ratio: {preclipped_ratio_epoch/n:.6f}, average policy_loss: {policy_loss_epoch/n:.6f}, average value_loss: {value_loss_epoch/n:.6f}")
+ 
+            kl_losses.append(kl_loss_epoch/n)
+            preclipped_ratios.append(preclipped_ratio_epoch/n)
+            policy_losses.append(policy_loss_epoch/n)
+            value_losses.append(value_loss_epoch/n)
+        
+        return {
+            "kl_losses" : kl_losses,
+            "preclipped_ratios" : preclipped_ratios,
+            "policy_losses" : policy_losses,
+            "value_losses" : value_losses
+        }

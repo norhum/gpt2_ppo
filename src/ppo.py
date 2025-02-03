@@ -14,8 +14,8 @@ class ValueNetwork(nn.Module):
         self.model = pretrained_model  
         self.value_head = nn.Linear(self.model.config.n_embd, 1)  
 
-    def forward(self, input_ids): #(Batch, seq_len)
-        outputs = self.model(input_ids) 
+    def forward(self, input_ids, attention_mask=None): #(Batch, seq_len)
+        outputs = self.model(input_ids, attention_mask) 
         hidden_states = outputs["last_hidden_state"] #(Batch, seq_len, n_embd)
         state_value = self.value_head(hidden_states[:, -1, :])  # Use the last token's hidden state
         
@@ -123,7 +123,15 @@ class PPOAgent:
 
         # Precompute old probabilities and values (detached from computation graph)
         with torch.no_grad():
-            old_action_probs = self.policy_network(state_tensors, attention_mask=attention_mask)["probs"].gather(2, action_tensors.unsqueeze(-1)).squeeze(-1) #(B, seq_len)
+            last_token_indices = (attention_mask != 1).to(torch.long).argmax(dim=1)
+            last_token_indices_list = last_token_indices.tolist()
+            last_token_indices_list = [last_token_indices_list[0] - 1] + last_token_indices_list[:-1]
+            last_token_indices = torch.tensor(last_token_indices_list) #([B])
+ 
+            inter = self.policy_network(state_tensors, attention_mask=attention_mask)["probs"] #([B, seq_len, vocab_size])
+            inter = inter[torch.arange(inter.size(0)), last_token_indices] #([B, vocab_size])
+
+            old_action_probs = inter.gather(1, action_tensors.unsqueeze(-1)).squeeze(-1) #(B,)
 
             old_values = self.value_network(state_tensors, attention_mask=attention_mask) #(B,)
             advantages = discounted_rewards - old_values #(B,)
@@ -139,18 +147,21 @@ class PPOAgent:
                 end = min(start + self.batch_size, len(state_tensors))
                 batch_indices = indices[start:end]
                 
-                batch_state_tensors = state_tensors[batch_indices] #(b,)
-                batch_attention_mask = attention_mask[batch_indices]
-                batch_action_tensors = action_tensors[batch_indices] #(b, seq_len)
+                batch_state_tensors = state_tensors[batch_indices] #(b, seq_len)
+                batch_attention_mask = attention_mask[batch_indices] #(b, seq_len)
+                batch_last_token_indices = last_token_indices[batch_indices] #(b,)
+                batch_action_tensors = action_tensors[batch_indices] #(b,)
                 batch_advantages = advantages[batch_indices] #(b,)
                 batch_discounted_rewards = discounted_rewards[batch_indices] #(b,)
-                batch_old_action_probs = old_action_probs[batch_indices] #(b, seq_len)
+                batch_old_action_probs = old_action_probs[batch_indices] #(b,)
 
                 # Policy loss
-                new_action_probs = self.policy_network(batch_state_tensors, attention_mask=batch_attention_mask).gather(2, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b, seq_len)
-                ratios = new_action_probs / (batch_old_action_probs + 1e-8) #(b, seq_len)
+                inter = self.policy_network(batch_state_tensors, attention_mask=batch_attention_mask)["probs"] #([b, seq_len, vocab_size])
+                inter = inter[torch.arange(inter.size(0)), batch_last_token_indices] #([b, vocab_size])
+                new_action_probs = inter.gather(1, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b,)
+                ratios = new_action_probs / (batch_old_action_probs + 1e-8) #(b,)
                 
-                clipped_ratios = torch.clamp(ratios, 1 - self.clip_epsilon, 1 + self.clip_epsilon) #(b, seq_len)
+                clipped_ratios = torch.clamp(ratios, 1 - self.clip_epsilon, 1 + self.clip_epsilon) #(b,)
                 policy_loss = -torch.min(ratios * batch_advantages, clipped_ratios * batch_advantages).mean()
                 #old_action_probs and advantages aren't being updated, only the new_action_probs are
                 #advantages>0 means an action was better than expected
@@ -163,6 +174,7 @@ class PPOAgent:
 
                 # Value loss
                 values = self.value_network(batch_state_tensors, attention_mask=batch_attention_mask) #(b,)
+  
                 value_loss = F.mse_loss(values, batch_discounted_rewards)
 
                 self.value_optimizer.zero_grad()

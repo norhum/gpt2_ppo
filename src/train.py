@@ -18,7 +18,7 @@ def train_ppo_agent(episodes=1000):
     agent = PPOAgent(device=device)
 
     for episode in range(episodes):
-        state = env.reset()
+        state = env.reset(episode)
         done = False
         episode_states, episode_actions, episode_rewards = [], [], []
         total_reward = 0
@@ -55,18 +55,26 @@ def train_ppo_agent(episodes=1000):
 
         # Create padding mask based on eos_token
         eos_token_id = tokenizer.eos_token_id
-        attention_mask = (episode_states != eos_token_id).long().squeeze()  # # (B, max_len) 1 for non-padding tokens, 0 for padding tokens 
+        attention_mask = (episode_states != eos_token_id).long().squeeze()  # (B, max_len) 1 for non-padding tokens, 0 for padding tokens 
 
-        agent.train(episode_states, attention_mask, episode_actions, episode_rewards)
+        end_time = time.time() 
+        elapsed_time = end_time - start_time  
+        print(f"before train:  {elapsed_time:.4f} seconds")
+
+        agent.train(episode_states, attention_mask, episode_actions, episode_rewards) # this is where it takes the most time and resource
         
         if episode % 100 == 0:
-            print(f"Episode {episode}: Total Reward = {total_reward}")
+            print(f"Episode {episode}: Total Reward = {total_reward:.6f}")
 
     return agent
 
 # --------------------------------------------------------------------------------
 
 if __name__ == '__main__':
+    import time
+    start_time = time.time()
+
     device = device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training Proximal Policy Optimization Agent:")
-    trained_agent = train_ppo_agent(episodes=500)
+    print(device)
+    trained_agent = train_ppo_agent(episodes=2)

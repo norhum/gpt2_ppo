@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from transformers import AutoTokenizer
 import numpy as np
-from model import GPT, GPTConfig
+from model import GPT
 
-# todo's : implement attention mask in gpt and use gpt that i coded instead / LLMEnvironment reset is linked to adding new data / ppo features in paper yet uncovered / training and validation / hellaswag
+# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag
 # possible error : reward might not be correctly implemented
 
 class ValueNetwork(nn.Module):
@@ -34,12 +35,12 @@ class LLMEnvironment:
         self.max_tokens = max_tokens
         self.reset()
     
-    def reset(self):
+    def reset(self, i):
         """Reset the environment to initial state with a new starting token"""
-        from transformers import AutoTokenizer
-        import torch
         enc = AutoTokenizer.from_pretrained("gpt2")
-        tokens = enc.encode("Hello, I'm a language model,", add_special_tokens=True)
+        with open("sentences.txt", "r") as f:
+            sentences = f.readlines()
+        tokens = enc.encode(sentences[i][:-1], add_special_tokens=True)
         tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")  # (1, seq_len)
         self.num_steps = 0
   
@@ -75,12 +76,12 @@ class LLMEnvironment:
         # Can add additional done conditions like:
         # - Better model gives very low probability
         # - Generated invalid sequence
-        # Can't stop and eos_token since we use that for padding
+        # Can't stop for eos_token since we use that for padding
         
         return next_state, reward, done
 
 class PPOAgent:
-    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=10, batch_size=64):      
+    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=5, batch_size=64):      
         self.device = device
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
@@ -111,7 +112,7 @@ class PPOAgent:
             return value.item()
     
     def train(self, state_tensors, attention_mask, action_tensors, reward_tensors):
-        
+
         # Calculate discounted rewards for the entire episode
         discounted_rewards = []
         cumulative_reward = 0
@@ -138,12 +139,17 @@ class PPOAgent:
             # Normalize advantages
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) #(B,)
 
-        for _ in range(self.update_epochs):
+        for epoch in range(self.update_epochs):
+
+            import time
+            start_time = time.time() 
+
             # Shuffle data
             indices = np.arange(len(state_tensors))
             np.random.shuffle(indices)
 
             for start in range(0, len(state_tensors), self.batch_size):
+        
                 end = min(start + self.batch_size, len(state_tensors))
                 batch_indices = indices[start:end]
                 
@@ -160,9 +166,12 @@ class PPOAgent:
                 inter = inter[torch.arange(inter.size(0)), batch_last_token_indices] #([b, vocab_size])
                 new_action_probs = inter.gather(1, batch_action_tensors.unsqueeze(-1)).squeeze(-1) #(b,)
                 ratios = new_action_probs / (batch_old_action_probs + 1e-8) #(b,)
-                
+
                 clipped_ratios = torch.clamp(ratios, 1 - self.clip_epsilon, 1 + self.clip_epsilon) #(b,)
+                avg_clipped_ratio = clipped_ratios.mean()
+                print(f"Average Clipped Ratio: {avg_clipped_ratio:.6f}")
                 policy_loss = -torch.min(ratios * batch_advantages, clipped_ratios * batch_advantages).mean()
+                print(f"policy_loss: {policy_loss:.6f}")
                 #old_action_probs and advantages aren't being updated, only the new_action_probs are
                 #advantages>0 means an action was better than expected
                 #ratios>0 means the new policy is increasing the probability of that action
@@ -176,7 +185,12 @@ class PPOAgent:
                 values = self.value_network(batch_state_tensors, attention_mask=batch_attention_mask) #(b,)
   
                 value_loss = F.mse_loss(values, batch_discounted_rewards)
+                print(f"value_loss: {value_loss:.6f}")
 
                 self.value_optimizer.zero_grad()
                 value_loss.backward()
                 self.value_optimizer.step()
+
+            end_time = time.time() 
+            elapsed_time = end_time - start_time
+            print(f"after epoch {epoch+1}:  {elapsed_time:.4f} seconds")

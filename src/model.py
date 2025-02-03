@@ -217,8 +217,8 @@ if __name__ == '__main__':
     model.eval()
     model.to('cuda')
 
-    from transformers import GPT2Tokenizer
-    enc = GPT2Tokenizer.from_pretrained('gpt2')
+    from transformers import AutoTokenizer
+    enc = AutoTokenizer.from_pretrained('gpt2')
 
     tokens = enc.encode("Hello, I'm a language model,")
     tokens = torch.tensor(tokens, dtype=torch.long) # (8,)

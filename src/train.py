@@ -8,8 +8,8 @@ import json
 import os
 
 # Load environment model
-# env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
-env_model = AutoModelForCausalLM.from_pretrained("gpt2") # for debugging
+env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
+# env_model = AutoModelForCausalLM.from_pretrained("gpt2") # for debugging
 
 # Load tokenizer 
 tokenizer = AutoTokenizer.from_pretrained('gpt2')

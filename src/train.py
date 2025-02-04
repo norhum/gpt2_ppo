@@ -116,4 +116,5 @@ if __name__ == '__main__':
     print("Training Proximal Policy Optimization Agent:")
     print(device)
     os.makedirs("models", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
     trained_agent = train_ppo_agent(episodes=1000)

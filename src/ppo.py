@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 import numpy as np
 from model import GPT
 
-# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag / move the data to data directory
+# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag 
 # possible error : different reward scheme might be better
 
 class ValueNetwork(nn.Module):
@@ -37,7 +37,7 @@ class LLMEnvironment:
     def reset(self, i):
         """Reset the environment to initial state with a new starting token"""
         enc = AutoTokenizer.from_pretrained("gpt2")
-        with open("sentences.txt", "r") as f:
+        with open(r"data\sentences.txt", "r") as f:
             sentences = f.readlines()
         tokens = enc.encode(sentences[i][:-1], add_special_tokens=True)
         tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")  # (1, seq_len)
@@ -208,7 +208,7 @@ class PPOAgent:
 
                 n += 1
             
-            print(f"epoch: {epoch}, average kl_loss: {kl_loss_epoch/n:.6f}, average preclipped_ratio: {preclipped_ratio_epoch/n:.6f}, average policy_loss: {policy_loss_epoch/n:.6f}, average value_loss: {value_loss_epoch/n:.6f}")
+            print(f"epoch: {epoch}, kl_loss: {kl_loss_epoch/n:.4f}, preclipped_ratio: {preclipped_ratio_epoch/n:.4f}, policy_loss: {policy_loss_epoch/n:.4f}, value_loss: {value_loss_epoch/n:.4f}")
  
             kl_losses.append(kl_loss_epoch/n)
             preclipped_ratios.append(preclipped_ratio_epoch/n)
@@ -216,8 +216,8 @@ class PPOAgent:
             value_losses.append(value_loss_epoch/n)
         
         return {
-            "kl_losses" : kl_losses,
-            "preclipped_ratios" : preclipped_ratios,
-            "policy_losses" : policy_losses,
-            "value_losses" : value_losses
+            "kl_losses" : [loss.item() for loss in kl_losses],
+            "preclipped_ratios" : [loss.item() for loss in preclipped_ratios],
+            "policy_losses" : [loss.item() for loss in policy_losses],
+            "value_losses" : [loss.item() for loss in value_losses]
         }

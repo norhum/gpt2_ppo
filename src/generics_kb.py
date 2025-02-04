@@ -9,6 +9,6 @@ sentences = ds['train']['generic_sentence']
 pruned_sentences = [" ".join(i.split()[:-1]) for i in sentences]
 random.shuffle(pruned_sentences)
 
-with open("sentences.txt", "w") as file:
+with open(r"data/sentences.txt", "w") as file:
     for sentence in pruned_sentences:
         file.write(sentence + "\n")

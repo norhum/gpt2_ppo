@@ -1,12 +1,14 @@
 __pycache__/
 *.pyc
 
+logs/
 models/
 
-*.ipynb
+#temp
+src/hellaswag
+
+play.ipynb
 
 .env
 
 src/mymodel.py
-
-hellaswag/

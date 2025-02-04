@@ -1,6 +1,6 @@
 # GPT-2 (124M) Fine-tuning with Proximal Policy Optimization (PPO) for HellaSwag (Work in Progress)
 
-This project aims to fine-tune the GPT-2 (124M) language model using Proximal Policy Optimization (PPO) to achieve higher performance on the HellaSwag commonsense reasoning benchmark than the official score reported in the HellaSwag paper. EleutherAI/gpt-neo-2.7B is currently being used as the reward model.
+This project aims to fine-tune the GPT-2 (124M) language model using Proximal Policy Optimization (PPO) to achieve higher performance on the HellaSwag commonsense reasoning benchmark than the official score reported in the HellaSwag paper(0.2955, completion style). EleutherAI/gpt-neo-2.7B is currently being used as the reward model.
 
 **Status: This project is currently a work in progress.**
 

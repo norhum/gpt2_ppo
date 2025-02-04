@@ -37,7 +37,7 @@ class LLMEnvironment:
     def reset(self, i):
         """Reset the environment to initial state with a new starting token"""
         enc = AutoTokenizer.from_pretrained("gpt2")
-        with open(r"data\sentences.txt", "r") as f:
+        with open(r"data/sentences.txt", "r") as f:
             sentences = f.readlines()
         tokens = enc.encode(sentences[i][:-1], add_special_tokens=True)
         tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")  # (1, seq_len)

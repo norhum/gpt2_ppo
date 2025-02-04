@@ -6,9 +6,6 @@ from transformers import AutoTokenizer
 import numpy as np
 from model import GPT
 
-# todo's : use gpt that i coded instead / ppo features in paper yet uncovered / training and validation with tracking/ hellaswag 
-# possible error : different reward scheme might be better
-
 class ValueNetwork(nn.Module):
     def __init__(self, pretrained_model):
         super(ValueNetwork, self).__init__()

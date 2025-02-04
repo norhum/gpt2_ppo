@@ -6,8 +6,7 @@ This project aims to fine-tune the GPT-2 (124M) language model using Proximal Po
 
 * Fine-tune GPT-2 (124M) using PPO.
 * Surpass the baseline HellaSwag performance.
-* Provide a reproducible training setup and clear evaluation metrics.
-* Integrate a custom-trained GPT-2 model in place of the pre-trained GPT-2 (124M).
+* Implement additional features based on the PPO paper.
 * **Future Goal:** Andrej scores around 33.7(which is the score with GTP3 (Small)) for hellaswag in the [Let's produce GPT-2 (124M)](https://www.youtube.com/watch?v=l8pRSuU81PU&t=12714s) lecture which will be our ultimal goal for this project.
 
 ## Practical Limitations and Challenges

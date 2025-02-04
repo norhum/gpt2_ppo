@@ -7,8 +7,8 @@ from hellaswag import iterate_examples, render_example, get_most_likely_row
 import json
 
 # Load environment model
-# env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
-env_model = AutoModelForCausalLM.from_pretrained("gpt2")
+env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
+# env_model = AutoModelForCausalLM.from_pretrained("gpt2") # for debugging
 
 # Load tokenizer 
 tokenizer = AutoTokenizer.from_pretrained('gpt2')

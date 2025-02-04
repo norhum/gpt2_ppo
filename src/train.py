@@ -5,6 +5,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from ppo import LLMEnvironment, PPOAgent
 from hellaswag import iterate_examples, render_example, get_most_likely_row
 import json
+import os
 
 # Load environment model
 # env_model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-neo-2.7B")
@@ -114,4 +115,5 @@ if __name__ == '__main__':
     device = device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training Proximal Policy Optimization Agent:")
     print(device)
+    os.makedirs("models", exist_ok=True)
     trained_agent = train_ppo_agent(episodes=1000)

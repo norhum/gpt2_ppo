@@ -79,7 +79,7 @@ def train_ppo_agent(episodes=1000):
         print()
 
         # once in a while evaluate hellaswag and log the data instead of returning it at the end. both to the logs folder
-        if episode % 50 == 0:
+        if (episode % 50 == 0) & (episode != 0):
             start_time2 = time.time()
             num_correct_norm = 0
             num_total = 0

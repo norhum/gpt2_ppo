@@ -20,7 +20,7 @@ class ValueNetwork(nn.Module):
         return state_value.squeeze() #(Batch)
 
 class LLMEnvironment:
-    def __init__(self, better_model, device, max_tokens=30):
+    def __init__(self, better_model, device, max_tokens=20):
         """
         Initialize the LLM environment
         
@@ -126,6 +126,7 @@ class PPOAgent:
             last_token_indices_list = last_token_indices.tolist()
             last_token_indices_list = [last_token_indices_list[0] - 1] + last_token_indices_list[:-1]
             last_token_indices = torch.tensor(last_token_indices_list) #([B])
+            print("a")
  
             inter = self.policy_network(state_tensors, attention_mask=attention_mask)["probs"] #([B, seq_len, vocab_size])
             inter = inter[torch.arange(inter.size(0)), last_token_indices] #([B, vocab_size])

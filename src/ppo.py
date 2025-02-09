@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 import numpy as np
+import random
 from model import GPT
 
 class ValueNetwork(nn.Module):
@@ -36,7 +37,9 @@ class LLMEnvironment:
         enc = AutoTokenizer.from_pretrained("gpt2")
         with open(r"data/sentences.txt", "r") as f:
             sentences = f.readlines()
-        tokens = enc.encode(sentences[i][:-1], add_special_tokens=True)
+
+        random_sentence = random.choice(sentences).strip()  # .strip() removes the newline character at the end
+        tokens = enc.encode(random_sentence, add_special_tokens=True)
         tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")  # (1, seq_len)
         self.num_steps = 0
   
@@ -126,7 +129,6 @@ class PPOAgent:
             last_token_indices_list = last_token_indices.tolist()
             last_token_indices_list = [last_token_indices_list[0] - 1] + last_token_indices_list[:-1]
             last_token_indices = torch.tensor(last_token_indices_list) #([B])
-            print("a")
  
             inter = self.policy_network(state_tensors, attention_mask=attention_mask)["probs"] #([B, seq_len, vocab_size])
             inter = inter[torch.arange(inter.size(0)), last_token_indices] #([B, vocab_size])

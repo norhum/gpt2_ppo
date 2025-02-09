@@ -21,7 +21,6 @@ def train_ppo_agent(episodes=1000):
     agent = PPOAgent(device=device)
 
     for episode in range(episodes):
-        start_time = time.time()
         state = env.reset(episode)
         done = False
         episode_states, episode_actions, episode_rewards = [], [], []
@@ -74,13 +73,9 @@ def train_ppo_agent(episodes=1000):
             with open(f"logs/data_{episode}.json", "w") as f:
                 json.dump(data, f, indent=4)
 
-        end_time = time.time()
-        print(f"episode: {episode}, took {end_time - start_time:.4f} seconds")
-        print()
-
         # once in a while evaluate hellaswag and log the data instead of returning it at the end. both to the logs folder
         if (episode % 50 == 0) & (episode != 0):
-            start_time2 = time.time()
+            start_time = time.time()
             num_correct_norm = 0
             num_total = 0
             for i, example in enumerate(iterate_examples("val")):
@@ -103,8 +98,8 @@ def train_ppo_agent(episodes=1000):
             acc_norm = num_correct_norm / num_total
     
             print(f"HellaSwag accuracy: {num_correct_norm}/{num_total}={acc_norm:.4f}")
-            end_time2 = time.time()
-            print(f"HellaSwag took {end_time2 - start_time2:.4f} seconds")
+            end_time = time.time()
+            print(f"HellaSwag took {end_time - start_time:.4f} seconds")
             print()
             with open(r"logs/hellaswag", "a") as f:
                 f.write(f"{episode} hellaswag {acc_norm:.4f}\n")

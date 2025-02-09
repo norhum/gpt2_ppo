@@ -218,8 +218,8 @@ class PPOAgent:
         print(f"kl_loss: {kl_losses/n:.4f}, preclipped_ratio: {preclipped_ratios/n:.4f}, policy_loss: {policy_losses/n:.4f}, value_loss: {value_losses/n:.4f}")
  
         return {
-            "kl_losses" : kl_losses,
-            "preclipped_ratios" : preclipped_ratios,
-            "policy_losses" : policy_losses,
-            "value_losses" : value_losses
+            "kl_losses" : kl_losses.item(),
+            "preclipped_ratios" : preclipped_ratios.item(),
+            "policy_losses" : policy_losses.item(),
+            "value_losses" : value_losses.item()
         }

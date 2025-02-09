@@ -108,8 +108,6 @@ def train_ppo_agent(episodes=1000):
             print()
             with open(r"logs/hellaswag", "a") as f:
                 f.write(f"{episode} hellaswag {acc_norm:.4f}\n")
-
-        # once in a while generate from the model (except step 0, which is noise)
         
     return agent
 

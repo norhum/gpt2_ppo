@@ -77,7 +77,7 @@ class LLMEnvironment:
         return next_state, reward, done
 
 class PPOAgent:
-    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=5, batch_size=32, kl_beta=0.1, kl_epsilon=1e-8):      
+    def __init__(self, device, learning_rate=0.0003, discount_factor=0.99, clip_epsilon=0.2, update_epochs=5, batch_size=64, kl_beta=0.1, kl_epsilon=1e-8):      
         self.device = device
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor

@@ -31,6 +31,7 @@ def train_ppo_agent(episodes=1000):
             action = agent.get_action(state) #(1, seq_len) -> (1,)
 
             next_state, reward, done = env.step(state, action)
+            print("a")
 
             episode_states.append(state) #(B, seq_len + k), where k is increasing (e.g., 0, 1, 2, ...)
             episode_actions.append(action) #(B,) index for the next token

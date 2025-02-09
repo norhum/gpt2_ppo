@@ -183,6 +183,8 @@ class PPOAgent:
                 preclipped_ratio = ratios.mean()
                 preclipped_ratio_epoch += preclipped_ratio
                 policy_loss = -torch.min(ratios * batch_advantages, clipped_ratios * batch_advantages).mean() + self.kl_beta * kl_loss
+                #https://ai.stackexchange.com/questions/37608/why-clip-the-ppo-objective-on-only-one-side
+                #A nice discussion of why we clip only one side and not both sides
                 policy_loss_epoch += policy_loss
                 #old_action_probs and advantages aren't being updated, only the new_action_probs are
                 #advantages>0 means an action was better than expected

@@ -210,13 +210,13 @@ class PPOAgent:
 
                 n += 1
             
-            print(f"epoch: {epoch}, kl_loss: {kl_loss_epoch/n:.4f}, preclipped_ratio: {preclipped_ratio_epoch/n:.4f}, policy_loss: {policy_loss_epoch/n:.4f}, value_loss: {value_loss_epoch/n:.4f}")
- 
             kl_losses.append(kl_loss_epoch/n)
             preclipped_ratios.append(preclipped_ratio_epoch/n)
             policy_losses.append(policy_loss_epoch/n)
             value_losses.append(value_loss_epoch/n)
-        
+
+        print(f"kl_loss: {kl_losses/n:.4f}, preclipped_ratio: {preclipped_ratios/n:.4f}, policy_loss: {policy_losses/n:.4f}, value_loss: {value_losses/n:.4f}")
+ 
         return {
             "kl_losses" : [loss.item() for loss in kl_losses],
             "preclipped_ratios" : [loss.item() for loss in preclipped_ratios],

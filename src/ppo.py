@@ -20,7 +20,7 @@ class ValueNetwork(nn.Module):
         return state_value.squeeze() #(Batch)
 
 class LLMEnvironment:
-    def __init__(self, better_model, device, max_tokens=50):
+    def __init__(self, better_model, device, max_tokens=30):
         """
         Initialize the LLM environment
         

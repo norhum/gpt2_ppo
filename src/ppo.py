@@ -140,10 +140,10 @@ class PPOAgent:
             # Normalize advantages
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) #(B,)
 
-        kl_losses = []
-        preclipped_ratios = []
-        policy_losses = []
-        value_losses = []
+        kl_losses = 0
+        preclipped_ratios = 0
+        policy_losses = 0
+        value_losses = 0
 
         for epoch in range(self.update_epochs):
 
@@ -210,16 +210,16 @@ class PPOAgent:
 
                 n += 1
             
-            kl_losses.append(kl_loss_epoch/n)
-            preclipped_ratios.append(preclipped_ratio_epoch/n)
-            policy_losses.append(policy_loss_epoch/n)
-            value_losses.append(value_loss_epoch/n)
+            kl_losses += kl_loss_epoch/n
+            preclipped_ratios += preclipped_ratio_epoch/n
+            policy_losses += policy_loss_epoch/n
+            value_losses += value_loss_epoch/n
 
         print(f"kl_loss: {kl_losses/n:.4f}, preclipped_ratio: {preclipped_ratios/n:.4f}, policy_loss: {policy_losses/n:.4f}, value_loss: {value_losses/n:.4f}")
  
         return {
-            "kl_losses" : [loss.item() for loss in kl_losses],
-            "preclipped_ratios" : [loss.item() for loss in preclipped_ratios],
-            "policy_losses" : [loss.item() for loss in policy_losses],
-            "value_losses" : [loss.item() for loss in value_losses]
+            "kl_losses" : kl_losses,
+            "preclipped_ratios" : preclipped_ratios,
+            "policy_losses" : policy_losses,
+            "value_losses" : value_losses
         }
